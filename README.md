@@ -1,5 +1,6 @@
 # 3DShapes
 Renders a cone and cylinder while using Phong illumination techniques to change materials
+Ability to toggle lighting and change animation via axis of rotation
 
 # Showcase Imagees
 Cone render with gold material selected
