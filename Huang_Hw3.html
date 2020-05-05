@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<TITLE>Lights, Camera, Action!</TITLE> 
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+
+<TITLE>Lights, Camera, Action!</TITLE> 
+<!--
+canvas { background: white; }
+
+body {
+	font: 100%/1.4 Verdana, Arial, Helvetica, sans-serif;
+	background-color:#000;
+	margin: 0;
+	padding: 0;
+	color: #000;
+}
+	
+/* ~~ this fixed width container surrounds all other elements ~~ */
+.container {
+	width: 960px;
+	background-color: #FFF;
+	margin: 0 auto; /* the auto value on the sides, coupled with the width, centers the layout */
+}
+
+h1, h2, h3, h4, h5, h6, p {
+	margin-top: 0;	 /* removing the top margin gets around an issue where margins can escape from their containing div. The remaining bottom margin will hold it away from any elements that follow. */
+	padding-right: 0px;
+	padding-left: 0px; /* adding the padding to the sides of the elements within the divs, instead of the divs themselves, gets rid of any box model math. A nested div with side padding can also be used as an alternate method. */
+	margin-bottom: 2px; padding-bottom: 0;
+}-->
+</head>
+<script type="text/javascript" src="../common/webgl-utils.js"></script>
+<script type="text/javascript" src="../common/initShaders.js"></script>
+<script type="text/javascript" src="../common/MV.js"></script>
+<script type="text/javascript" src="Huang_hw3.js"></script>
+<script type="text/javascript" src="Huang_geometry.js"></script>
+
+<!-- Vertex shader 1: lighting calculations -->
+<!-- Lighting calculations are done in eye coordinates  -->
+<script id="vertex-shader" type="x-shader/x-vertex">
+
+
+attribute  vec4 vPosition;
+attribute vec3 vNormal;
+
+varying vec4 fColor;
+
+uniform vec3 theta;
+uniform vec3 scale;
+uniform vec3 translate;
+
+uniform float shininess;
+uniform vec4 ambientMult, diffuseMult, specularMult;
+
+uniform mat4 projectionMatrix;
+
+uniform vec4 lPosition1;
+uniform vec4 lPosition2;
+uniform int lEnabled1;
+uniform int lEnabled2;
+
+//calculates matrics for x,y,z, translating, scaling into model view matrix
+void main() {
+
+	vec3 angles = radians( theta );
+	vec3 a = cos( angles );
+	vec3 b = sin( angles );
+
+	mat4 sc = mat4(
+		scale.x, 0.0,     0.0,     0.0,
+		0.0,     scale.y, 0.0,     0.0,
+		0.0,     0.0,     scale.z, 0.0,
+		0.0,     0.0,     0.0,     1.0);
+
+	mat4 tr = mat4(
+		1.0,0.0,0.0,0.0,
+		0.0,1.0,0.0,0.0,
+		0.0,0.0,1.0,0.0,
+		translate.x, translate.y, translate.z, 1.0);
+
+	mat4 rx = mat4( 
+		1.0,  0.0,  0.0, 0.0,
+		0.0,  a.x,  b.x, 0.0,
+		0.0, -b.x,  a.x, 0.0,
+		0.0,  0.0,  0.0, 1.0);
+
+	mat4 ry = mat4( 
+		a.y, 0.0, -b.y, 0.0,
+		0.0, 1.0,  0.0, 0.0,
+		b.y, 0.0,  a.y, 0.0,
+		0.0, 0.0,  0.0, 1.0);
+
+	mat4 rz = mat4( 
+		a.z, -b.z, 0.0, 0.0,
+		b.z,  a.z, 0.0, 0.0,
+		0.0,  0.0, 1.0, 0.0,
+		0.0,  0.0, 0.0, 1.0);
+
+	mat4 modelViewMatrix = tr * rz * ry * rx * sc;
+
+	gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+    vec3 pos = -(vPosition*modelViewMatrix).xyz; 
+    
+    vec4 norm = vec4(vNormal, 0);
+    vec3 E = normalize( -pos ); 
+    
+    vec3 light1 = lPosition1.xyz;
+    vec3 nLight1 = normalize( light1 - pos );
+    vec3 nLight1a = normalize( nLight1 + E );
+    vec3 light2 = lPosition2.xyz;
+    vec3 nLight2 = normalize( light2 - pos ); 
+    vec3 nLight2a = normalize( nLight2 + E );
+  
+    vec3 N = normalize( (modelViewMatrix*norm).xyz);
+
+    vec4 ambient = ambientMult;    
+    float k1 = max( dot(nLight1, N), 0.0 );
+    vec4  diffuse1 = k1*diffuseMult;
+    float k2 = pow( max(dot(N, nLight1a), 0.0), shininess );
+    vec4  specular1 = k2 * specularMult;
+    float k3 = max( dot(nLight2, N), 0.0 );
+    vec4  diffuse2 = k3*diffuseMult;
+    float k4 = pow( max(dot(N, nLight2a), 0.0), shininess );
+    vec4  specular2 = k4 * specularMult;
+
+	if (lEnabled1 == 0) {
+		diffuse1 = vec4(0.0, 0.0, 0.0, 1.0);
+	}	
+	if (lEnabled2 == 0) {
+		diffuse2 = vec4(0.0, 0.0, 0.0, 1.0);
+	}	
+	if (dot(nLight1, N) < 0.0 || lEnabled1 == 0) {
+		specular1 = vec4(0.0, 0.0, 0.0, 1.0);
+	}
+	if (dot(nLight2, N) < 0.0 || lEnabled2 == 0) {
+		specular2 = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    fColor = ambient + diffuse1 + diffuse2 + specular1 + specular2;
+    fColor.a = 1.0;
+
+}
+
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float; 
+
+varying vec4 fColor;
+
+void main() {
+
+	gl_FragColor = fColor;
+}
+</script>
+<!-- *********  END SHADERS  ******************************************************* -->
+<!-- **************************************************************** -->
+ 
+
+<body>
+
+<div class="container">
+	<h1>3D Shapes and Phong Illumination</h1>
+	Jacquelin Huang</br>
+	4/7/2020</br>
+	<b>Description:</b></br>
+	Implements two 3D shapes using WebGL using triangulation data structure.</br>
+	Implements two material utilizing Phong Illumination technique which requires the material diffuse, shininess and ambient lighting.</br>
+	Ability to rotate using buttons and updating theta variable.</br>
+	Ability to change material shininess and toggle the lighting sources.</br>
+	<b>Resources Used:</b></br>
+	https://cse.taylor.edu/~jdenning/classes/cos350/slides/08_Cylinders.html</br>
+	http://voxelent.com/html/beginners-guide/chapter_2/ch2_Cone.html</br>
+
+	<canvas id="gl-canvas" width="512" height="512">
+	Oops ... your browser doesn't support the HTML5 canvas element
+	</canvas>
+	
+		<div>
+  			Choose Shape
+			<select name="shape" id="shape">
+				<option value="cylinder" selected="selected">Cylinder</option>
+				<option value="cone">Cone</option>
+			</select>			
+		</div>
+
+
+		 Choose Material
+		<select name="matColor" id="matColor">
+		<option value="ruby" selected="selected">Ruby</option>
+		<option value="gold">Gold</option>
+		</select>	
+		</br>				
+  		Rotate Options
+		<div>
+  			<button type="button" value="Rotate X" id="rotX">Rotate X</button>
+  			<button type="button" value="Rotate Z" id="rotZ">Rotate Z</button>
+  			<button type="button" value="Rotate Y" id="rotY">Rotate Y</button>
+  			<button type="button" value="No Rotation" id="rotS">Pause Rotations</button>
+		</div>			
+			
+  		Choose Material shininess
+  		<input id="shiny" name="shiny" type="range" min="1" max="100" value="60" step="1" oninput="shinebox.value=shiny.value"/>
+  		<input id="shinebox" name="shinebox" type="text" value="60" maxlength="2" size="4" readonly/>
+
+		<div>
+			<input type="checkbox" name="light1" id="light1" value="y" checked="checked">Light source 1&nbsp;
+			<input type="checkbox" name="light2" id="light2" value="y" checked="checked">Light source 2&nbsp;
+		</div>
+	</div>
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+</body>
+</html>
