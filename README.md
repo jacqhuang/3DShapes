@@ -1,5 +1,5 @@
 # 3DShapes
-Renders a cone and cylinder while using Phong illumination techniques to change materials.
+Renders a cone and cylinder using triangluation data structure. Utilizes Phong illumination techniques to change materials.
 Ability to toggle lighting and change animation via axis of rotation.
 
 # Showcase Imagees
